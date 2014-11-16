@@ -1,0 +1,86 @@
+---
+title: "Human Activity Recognition"
+output:
+  html_document:
+    keep_md: yes
+---
+
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+We analyze the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here] (http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset). 
+
+The goal of the project is to predict the manner in which they did the exercise.
+
+
+## Data preprocessing   
+We load the following libraries that are used throughout the code.
+```{r, message=FALSE}
+library(caret)
+library(randomForest)
+library(foreach)
+library(doParallel)
+```
+
+The csv files containing the training and test data are downloaded into the working directory.
+```{r}
+if (!file.exists("training.csv")) {
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+                  destfile = "training.csv")
+}
+if (!file.exists("testing.csv")) {
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+                  destfile = "testing.csv")
+}
+```
+
+We first load the training data
+```{r, cache=TRUE}
+dtTrain <- read.csv("training.csv", na.strings= c("NA",""," ","#DIV/0!"))
+```
+We remove the first 7 columns that contain the user names, timestamps and windows.
+```{r, echo=FALSE, cache=TRUE}
+colnames(dtTrain[1:7])
+```
+There are several columns filled with too many NA's and thus not useful in prediction. We also remove these columns entirely.
+```{r, cache=TRUE}
+dtTrain <- dtTrain[8:dim(dtTrain)[2]]
+selection <- colSums(is.na(dtTrain))==0
+dtTrain2 <- subset(dtTrain, select=selection)
+```
+There are `r sum(selection)` variables with no NA's. They will be used in prediction.
+
+We check for near zero covariates and remove them, if any, since they do not contribute well to prediction.
+```{r, cache=TRUE}
+selection2 <- nearZeroVar(dtTrain2, saveMetrics=TRUE)$nzv
+dtTrain2 <- dtTrain2[, !selection2]
+```
+
+The pre-processed training data set is then split up into training and cross validation sets by 3:1.
+```{r, cache=TRUE}
+inTrain <- createDataPartition(dtTrain2$classe, p=3/4, list=FALSE)
+training <- dtTrain2[inTrain, ]
+validation <- dtTrain2[-inTrain, ]
+```
+
+
+## Model building  
+We fit a random forests predictor relating the factor variable `classe` to the remaining variables. To speed up the learning process, we make use of parallel processing.
+
+```{r, cache=TRUE}
+registerDoParallel()
+modFit1 <- foreach(ntree=rep(150, 6), .combine=combine, .multicombine=TRUE, .packages='randomForest') %dopar% {
+    randomForest(training[-53], training$classe, ntree=ntree)
+}
+```
+As parallel processing is used, the output `modFit1` does not contain out of sample error. We will estimate the error using cross validation data.
+
+
+## Cross-validation  
+The model is used to classify the cross-validation data. The accuracy of the model is found by comparing the prediction and the actual classification using the confusion matrix function.
+```{r}
+pred1 <- predict(modFit1, newdata=validation)
+confusionMatrix(pred1, validation$classe)
+```
+
+The random forests model yields a 99.6% prediction accuracy using the cross validation data. Thus, we estimate the out of sample error to be 0.4%.
