@@ -56,10 +56,10 @@ We check for near zero covariates and remove them, if any, since they do not con
 
 ```r
 selection2 <- nearZeroVar(dtTrain2, saveMetrics=TRUE)$nzv
-dtTrain2 <- dtTrain2[, !selection2]
 ```
+Since there are 0 near zero covariates, we will use all the variables for training and prediction.
 
-The pre-processed training data set is then split up into training and cross validation sets by 3:1.
+The preprocessed training data set is then split into training and cross-validation sets by 3:1.
 
 ```r
 inTrain <- createDataPartition(dtTrain2$classe, p=3/4, list=FALSE)
@@ -78,7 +78,6 @@ modFit1 <- foreach(ntree=rep(150, 6), .combine=combine, .multicombine=TRUE, .pac
     randomForest(training[-53], training$classe, ntree=ntree)
 }
 ```
-
 As parallel processing is used, the output `modFit1` does not contain out of sample error. We will estimate the error using cross validation data.
 
 
@@ -125,3 +124,26 @@ confusionMatrix(pred1, validation$classe)
 ```
 
 The random forests model yields a 99.6% prediction accuracy using the cross validation data. Thus, we estimate the out of sample error to be 0.4%.
+
+
+## Prediction 
+We now classify the testing data using the prediction model we have constructed earlier.
+
+```r
+dtTest <- read.csv("testing.csv")
+dtTest <- dtTest[8:dim(dtTest)[2]]
+testing <- subset(dtTest, select=selection)
+pred <- predict(modFit1, newdata=testing)
+```
+We write the prediction `pred` for the 20 test cases into text files for submission.
+
+```r
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(pred)
+```

@@ -86,9 +86,9 @@ selection &lt;- colSums(is.na(dtTrain))==0
 dtTrain2 &lt;- subset(dtTrain, select=selection)</code></pre>
 <p>There are 53 variables with no NA’s. They will be used in prediction.</p>
 <p>We check for near zero covariates and remove them, if any, since they do not contribute well to prediction.</p>
-<pre class="r"><code>selection2 &lt;- nearZeroVar(dtTrain2, saveMetrics=TRUE)$nzv
-dtTrain2 &lt;- dtTrain2[, !selection2]</code></pre>
-<p>The pre-processed training data set is then split up into training and cross validation sets by 3:1.</p>
+<pre class="r"><code>selection2 &lt;- nearZeroVar(dtTrain2, saveMetrics=TRUE)$nzv</code></pre>
+<p>Since there are 0 near zero covariates, we will use all the variables for training and prediction.</p>
+<p>The preprocessed training data set is then split into training and cross-validation sets by 3:1.</p>
 <pre class="r"><code>inTrain &lt;- createDataPartition(dtTrain2$classe, p=3/4, list=FALSE)
 training &lt;- dtTrain2[inTrain, ]
 validation &lt;- dtTrain2[-inTrain, ]</code></pre>
@@ -139,6 +139,23 @@ confusionMatrix(pred1, validation$classe)</code></pre>
 ## Detection Prevalence    0.285    0.194    0.176    0.163    0.183
 ## Balanced Accuracy       1.000    0.997    0.996    0.996    0.999</code></pre>
 <p>The random forests model yields a 99.6% prediction accuracy using the cross validation data. Thus, we estimate the out of sample error to be 0.4%.</p>
+</div>
+<div id="prediction" class="section level2">
+<h2>Prediction</h2>
+<p>We now classify the testing data using the prediction model we have constructed earlier.</p>
+<pre class="r"><code>dtTest &lt;- read.csv(&quot;testing.csv&quot;)
+dtTest &lt;- dtTest[8:dim(dtTest)[2]]
+testing &lt;- subset(dtTest, select=selection)
+pred &lt;- predict(modFit1, newdata=testing)</code></pre>
+<p>We write the prediction <code>pred</code> for the 20 test cases into text files for submission.</p>
+<pre class="r"><code>pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0(&quot;problem_id_&quot;,i,&quot;.txt&quot;)
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(pred)</code></pre>
 </div>
 
 
